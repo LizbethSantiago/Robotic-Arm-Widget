@@ -30,6 +30,7 @@ from time import sleep
 import RPi.GPIO as GPIO 
 from pidev.stepper import stepper
 from pidev.Cyprus_Commands import Cyprus_Commands_RPi as cyprus
+from threading import Thread
 
 
 # ////////////////////////////////////////////////////////////////
@@ -73,7 +74,8 @@ cyprus.open_spi()
 # ////////////////////////////////////////////////////////////////
 
 sm = ScreenManager()
-arm = stepper(port = 0, speed = 10)
+s0 = stepper(port=0, micro_steps=32, hold_current=20, run_current=20, accel_current=20, deaccel_current=20,
+             steps_per_unit=200, speed=1)
 
 # ////////////////////////////////////////////////////////////////
 # //                       MAIN FUNCTIONS                       //
@@ -84,6 +86,10 @@ class MainScreen(Screen):
     version = cyprus.read_firmware_version()
     armPosition = 0
     lastClick = time.clock()
+    #this is the magnet
+    manny = False
+    #this is the arm:
+    hammy = False
 
     def __init__(self, **kwargs):
         super(MainScreen, self).__init__(**kwargs)
@@ -98,33 +104,127 @@ class MainScreen(Screen):
         return processInput
 
     def toggleArm(self):
+        if self.hammy == False:
+            self.hammy = False
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            self.hammy = True
+        else:
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            self.hammy = False
+
+
         print("Process arm movement here")
 
     def toggleMagnet(self):
+        if self.manny == False:
+            self.manny = False
+            cyprus.set_servo_position(2, 1)
+            self.manny = True
+        else:
+            cyprus.set_servo_position(2, .5)
+            self.manny = False
+
         print("Process magnet here")
         
     def auto(self):
-        print("Run the arm automatically here")
+        self.auto_button.disabled = True
+        if self.isBallOnTallTower():
+            s0.go_until_press(1, 6400)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            while s0.isBusy():
+                sleep(1)
+            s0.set_speed(.8)
+            s0.start_relative_move(-.5)
+            while s0.isBusy():
+                sleep(1)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(.5)
+            cyprus.set_servo_position(2, 1)
+            sleep(.5)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(1)
+            s0.set_speed(.8)
+            s0.start_relative_move(-.32)
+            while s0.isBusy():
+                sleep(1)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(1)
+            cyprus.set_servo_position(2, .5)
+            sleep(1)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(.5)
+            s0.go_until_press(1, 6400)
+            self.auto.disabled = False
+        else:
+            s0.go_until_press(1, 6400)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            while s0.isBusy():
+                sleep(1)
+            s0.set_speed(.8)
+            s0.start_relative_move(-.8)
+            while s0.isBusy():
+                sleep(1)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(1)
+            s0.set_speed(.8)
+            s0.start_relative_move(-.3)
+            while s0.isBusy():
+                sleep(1)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000,compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(1)
+            cyprus.set_servo_position(2, .5)
+            sleep(1)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0,compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(.5)
+            s0.go_until_press(1, 6400)
+            self.auto_button.disabled = False
+
+
+
+        #print("Run the arm automatically here")
+
+    def auto_thread(self):
+        Thread(target=self.auto, daemon=True).start()
 
     def setArmPosition(self, position):
+        s0.go_to_position(-position)
         print("Move arm here")
 
     def homeArm(self):
         arm.home(self.homeDirection)
         
     def isBallOnTallTower(self):
+        if cyprus.read_gpio() & 0b0001:
+            sleep(.1)
+            if cyprus.read_gpio() & 0b0001:
+                return False
+        else:
+            return True
         print("Determine if ball is on the top tower")
 
+
     def isBallOnShortTower(self):
-        print("Determine if ball is on the bottom tower")
-        
+
+        if cyprus.read_gpio() & 0b0010:
+            sleep(.1)
+            if cyprus.read_gpio() & 0b0010:
+                return False
+        else:
+            return True
+
+
+
+
+
+
     def initialize(self):
+        cyprus.initialize()
+        cyprus.setup_servo(1)
+        cyprus.set_servo_position(2, 0.5)
+        s0.go_until_press(1, 6400)
+
         print("Home arm and turn off magnet")
 
-    def resetColors(self):
-        self.ids.armControl.color = YELLOW
-        self.ids.magnetControl.color = YELLOW
-        self.ids.auto.color = BLUE
 
     def quit(self):
         MyApp().stop()
