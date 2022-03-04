@@ -125,12 +125,15 @@ class MainScreen(Screen):
             self.manny = False
 
         print("Process magnet here")
-        
+
     def auto(self):
         self.auto_button.disabled = True
-        if self.isBallOnTallTower():
+        self.armControl.disabled = True
+        self.magnetControl.disabled = True
+        self.moveArm.disabled = True
+        if self.isBallOnShortTower():
             s0.go_until_press(1, 6400)
-            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
             while s0.isBusy():
                 sleep(1)
             s0.set_speed(.8)
@@ -150,11 +153,14 @@ class MainScreen(Screen):
             cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
             sleep(1)
             cyprus.set_servo_position(2, .5)
-            sleep(1)
+            sleep(.5)
             cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
             sleep(.5)
             s0.go_until_press(1, 6400)
-            self.auto.disabled = False
+            self.auto_button.disabled = False
+            self.armControl.disabled = False
+            self.magnetControl.disabled = False
+            self.moveArm.disabled = False
         else:
             s0.go_until_press(1, 6400)
             cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
@@ -165,23 +171,28 @@ class MainScreen(Screen):
             while s0.isBusy():
                 sleep(1)
             cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            sleep(.5)
+            cyprus.set_servo_position(2, 1)
+            sleep(.5)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
             sleep(1)
             s0.set_speed(.8)
-            s0.start_relative_move(-.3)
+            s0.start_relative_move(.3)
             while s0.isBusy():
                 sleep(1)
-            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000,compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=100000, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
             sleep(1)
             cyprus.set_servo_position(2, .5)
             sleep(1)
-            cyprus.set_pwm_values(1, period_value=100000, compare_value=0,compare_mode=cyprus.LESS_THAN_OR_EQUAL)
+            cyprus.set_pwm_values(1, period_value=100000, compare_value=0, compare_mode=cyprus.LESS_THAN_OR_EQUAL)
             sleep(.5)
             s0.go_until_press(1, 6400)
             self.auto_button.disabled = False
+            self.armControl.disabled = False
+            self.magnetControl.disabled = False
+            self.moveArm.disabled = False
 
-
-
-        #print("Run the arm automatically here")
+        print("Run the arm automatically here")
 
     def auto_thread(self):
         Thread(target=self.auto, daemon=True).start()
@@ -204,7 +215,6 @@ class MainScreen(Screen):
 
 
     def isBallOnShortTower(self):
-
         if cyprus.read_gpio() & 0b0010:
             sleep(.1)
             if cyprus.read_gpio() & 0b0010:
@@ -219,9 +229,10 @@ class MainScreen(Screen):
 
     def initialize(self):
         cyprus.initialize()
-        cyprus.setup_servo(1)
+        cyprus.setup_servo(2)
         cyprus.set_servo_position(2, 0.5)
         s0.go_until_press(1, 6400)
+
 
         print("Home arm and turn off magnet")
 
